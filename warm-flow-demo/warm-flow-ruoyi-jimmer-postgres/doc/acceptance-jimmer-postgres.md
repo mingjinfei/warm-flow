@@ -39,7 +39,7 @@ Fork PR：<https://github.com/mingjinfei/warm-flow/pull/1>
 | RuoYi Jimmer PostgreSQL CI | `25911155071` / `Cold-start bootstrap and API smoke` | success | push 冷启动、完整 API smoke |
 | RuoYi Jimmer PostgreSQL CI | `25911155071` / `Browser E2E smoke` | success | push 浏览器级完整后台路由与设计器 token 自愈 |
 
-> 2026-05-15 之后 CI 已新增 `Build RuoYi UI from source` 门禁：每个 RuoYi Jimmer PostgreSQL CI job 都会执行 `npm ci --no-audit --no-fund` 与 `npm run build:prod`，防止只验证已提交静态产物。当前本地已通过该门禁；本次 push 后需要复核新的 GitHub Actions run。
+> 2026-05-15 已新增 `Build RuoYi UI from source` 门禁：每个 RuoYi Jimmer PostgreSQL CI job 都会执行 `npm ci --no-audit --no-fund` 与 `npm run build:prod`，防止只验证已提交静态产物。`a38f6542` 的后续 CI 暴露 Warm-Flow engine 表 nullability 过宽问题；当前提交用模型一致的 `NOT NULL` bootstrap 与 `V20260515_002` 增量迁移修复，推送后以 PR 最新 run 为准。
 
 关键 CI 命令：
 
@@ -53,9 +53,9 @@ gh pr view 1 --repo mingjinfei/warm-flow --json state,url,headRefName,baseRefNam
 提交前本地构建与静态检查：
 
 - `python3 scripts/generate_pg_init.py`：重新生成 `sql/postgresql/ruoyi-warm-flow-jimmer-postgres.sql`。
-- 自定义 nullable 校验：冷启动失败中列出的 Warm-Flow Jimmer nullable 字段在 generator 与 bootstrap SQL 中均不再带 `NOT NULL`。
+- 自定义 nullability 校验：Warm-Flow Jimmer nonnull 字段在 generator 与 bootstrap SQL 中保持 `NOT NULL`；业务示例表的 `@Nullable` 字段保持可空。
 - Quartz DDL 校验：`QRTZ_*` boolean 字段为 PostgreSQL `boolean`，并包含 20 个标准 Quartz 运行态索引。
-- `mvn -q -DskipTests -f warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/pom.xml -pl ruoyi-admin -am clean package`：通过。
+- `mvn -q -DskipTests -f pom.xml -pl warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-admin -am clean package`：通过，路径与 GitHub Actions root-pom 构建一致。
 - `(cd ruoyi-ui && npm ci --no-audit --no-fund && npm run build:prod)`：通过，仅有既有 asset size warning。
 - `git diff --check` 与 `python3 -m py_compile ...`：通过。
 
@@ -75,7 +75,7 @@ ssh workflow-dev-226 'cd /home/foo/warm-flow-jimmer-demo-coldtest; \
 
 - `BOOTSTRAP tables=41`、`BOOTSTRAP users=22`、`BOOTSTRAP menus=131`
 - `HEALTH_OK {"msg":"操作成功","code":200,...,"version":"3.9.1-jimmer-postgres"}`
-- 临时库：`warm_flow_jimmer_cold_20260515180726`
+- 临时库：`warm_flow_jimmer_cold_20260515183557`
 - 临时端口：`18082`
 - 结束后脚本自动清理临时容器、临时卷、临时库和临时用户。
 
@@ -86,6 +86,9 @@ ssh workflow-dev-226 'cd /home/foo/warm-flow-jimmer-demo-coldtest; \
 ```sh
 psql -v ON_ERROR_STOP=1 -d warm_flow_jimmer_demo \
   -f sql/migration/V20260515_001__quartz_postgres_boolean_columns.sql
+
+psql -v ON_ERROR_STOP=1 -d warm_flow_jimmer_demo \
+  -f sql/migration/V20260515_002__warm_flow_engine_not_null_columns.sql
 ```
 
 迁移后验证结果：
@@ -94,6 +97,9 @@ psql -v ON_ERROR_STOP=1 -d warm_flow_jimmer_demo \
 - `qrtz_fired_triggers.is_nonconcurrent/requests_recovery = boolean`
 - `qrtz_simprop_triggers.bool_prop_1/bool_prop_2 = boolean`
 - `quartz_indexes=20`
+- `flow_definition.flow_code=NO`、`flow_user.type=NO`、`flow_user.associated=NO`
+- `flow_his_task.flow_status=NO`
+- `flow_his_task.node_code=YES`、`flow_his_task.node_type=YES`（与 `FlowHisTaskModel` 的 `@Nullable` 保持一致）
 
 
 ## 远程部署 smoke
