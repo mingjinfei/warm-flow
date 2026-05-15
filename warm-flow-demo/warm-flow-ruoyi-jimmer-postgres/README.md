@@ -67,13 +67,16 @@ docker compose -f docker-compose.deploy.yml up -d --build
 # 非破坏性状态检查与烟测
 curl -fsS http://192.168.2.226:18080/health
 python3 scripts/smoke_remote.py --base-url http://192.168.2.226:18080/
+
+# 浏览器级验收：直接刷新完整后台路由，并验证 Warm-Flow 设计器 token 自愈
+REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/e2e_admin_designer.sh
 ```
 
 烟测会登录默认账号并覆盖 `system`、`monitor`、`tool`、`flow` 四类后台代表性只读接口，避免只验证流程设计器而遗漏完整管理后台。
 
 ## 部署流程
 
-本 Jimmer/PostgreSQL 交付模块请使用 `doc/deploy-ops.md` 与 `sql/postgresql/` 下脚本部署；`sql/legacy-mysql/` 仅作为 PostgreSQL 初始化脚本生成器的历史输入，不得在本模块直接执行。
+本 Jimmer/PostgreSQL 交付模块请使用 `doc/deploy-ops.md` 与 `sql/postgresql/` 下脚本部署；`sql/legacy-mysql/` 仅作为 PostgreSQL 初始化脚本生成器的历史输入，不得在本模块直接执行。已有环境升级必须新增 `sql/migration/` 增量脚本，详见 [`sql/migration/README.md`](sql/migration/README.md)。
 
 
 ## 工作流

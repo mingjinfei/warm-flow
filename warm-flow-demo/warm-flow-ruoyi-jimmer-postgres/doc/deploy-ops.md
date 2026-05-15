@@ -50,6 +50,8 @@ RUOYI_TOKEN_SECRET=change-me-long-random-secret
 
 - `sql/postgresql/ruoyi-warm-flow-jimmer-postgres.sql`
 
+> 已有环境升级请不要重跑全量初始化脚本；生产、预发、共享开发库的后续变更应放入 `sql/migration/`，规则见 [`../sql/migration/README.md`](../sql/migration/README.md)。
+
 首次部署前在 PostgreSQL 所在主机或可访问 PostgreSQL 的机器执行。示例命令会创建/授权演示库用户并导入 RuoYi、Quartz、Warm-Flow 与示例菜单数据；`ruoyi-warm-flow-jimmer-postgres.sql` 默认只允许空库/空 `public` schema 初始化，检测到已有表会拒绝继续。确需重置演示库时，必须先备份、人工审阅 SQL，并显式传入 `-v allow_destructive_reset=true`。
 
 ```sh
@@ -120,6 +122,8 @@ curl -fsS http://192.168.2.226:18080/health
 
 ## 烟测
 
+### API 烟测
+
 烟测脚本：`scripts/smoke_remote.py`，覆盖：
 
 - `/health`
@@ -162,6 +166,24 @@ python3 scripts/smoke_remote.py \
 # 或
 scripts/smoke_remote.sh --base-url http://192.168.2.226:18080/
 ```
+
+### 浏览器级 E2E
+
+`scripts/e2e_admin_designer.sh` 会在临时目录安装/复用 Playwright，不会把 `node_modules` 或浏览器缓存写入仓库。该验收覆盖两类 API 烟测无法发现的问题：
+
+- 直接刷新完整 RuoYi 管理后台路由仍能渲染 SPA，而不是退回登录页或空白页。
+- Warm-Flow 设计器会用当前 `Admin-Token` 覆盖本地陈旧 `Warm-Authorization`，并成功调用 `/warm-flow/query-def`、`/warm-flow/listener-list`。
+
+默认目标为 `http://192.168.2.226:18080/`，账号为 `admin/admin123`。如果 Redis 开启密码，通过环境变量传入，不要写入 Git：
+
+```sh
+REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/e2e_admin_designer.sh
+
+# 常用覆盖项
+WARM_FLOW_BASE=http://192.168.2.226:18080/ WARM_FLOW_USER=admin WARM_FLOW_PASSWORD=admin123 REDIS_HOST=192.168.2.226 REDIS_PORT=6379 REDIS_DATABASE=0 REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/e2e_admin_designer.sh
+```
+
+成功时末尾应输出 `bad=[]`。
 
 ## 故障排查
 
