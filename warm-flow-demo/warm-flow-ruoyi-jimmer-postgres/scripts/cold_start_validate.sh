@@ -32,6 +32,7 @@ JIMMER_PRETTY_SQL=${JIMMER_PRETTY_SQL:-false}
 HEALTH_RETRIES=${HEALTH_RETRIES:-90}
 HEALTH_INTERVAL_SECONDS=${HEALTH_INTERVAL_SECONDS:-2}
 KEEP_COLDSTART=${KEEP_COLDSTART:-false}
+KEEP_FAILED_COLDSTART=${KEEP_FAILED_COLDSTART:-false}
 COLDSTART_ACTION=${COLDSTART_ACTION:-run}
 STATE_FILE=${STATE_FILE:-/tmp/warm-flow-jimmer-coldstart.state}
 DB_SQL=${DB_SQL:-$APP_DIR/sql/postgresql/00-create-database.sql}
@@ -90,10 +91,17 @@ load_state() {
 
 cleanup() {
   code=$?
-  if [ "${KEEP_COLDSTART:-false}" = "true" ] && [ "$code" -eq 0 ] && [ "${COLDSTART_ACTION:-run}" = "run" ]; then
-    echo "KEEP_COLDSTART=true; temporary app remains at http://127.0.0.1:${COLDSTART_PORT}/"
-    echo "Cleanup later with: COLDSTART_ACTION=cleanup STATE_FILE=$STATE_FILE $0"
-    return "$code"
+  if [ "${COLDSTART_ACTION:-run}" = "run" ]; then
+    if [ "${KEEP_COLDSTART:-false}" = "true" ] && [ "$code" -eq 0 ]; then
+      echo "KEEP_COLDSTART=true; temporary app remains at http://127.0.0.1:${COLDSTART_PORT}/"
+      echo "Cleanup later with: COLDSTART_ACTION=cleanup STATE_FILE=$STATE_FILE $0"
+      return "$code"
+    fi
+    if [ "${KEEP_FAILED_COLDSTART:-false}" = "true" ] && [ "$code" -ne 0 ]; then
+      echo "KEEP_FAILED_COLDSTART=true; preserving failed cold-start resources for diagnostics" >&2
+      echo "Cleanup later with: COLDSTART_ACTION=cleanup STATE_FILE=$STATE_FILE $0" >&2
+      return "$code"
+    fi
   fi
 
   $DOCKER rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true

@@ -1,0 +1,195 @@
+name: RuoYi Jimmer PostgreSQL CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/ruoyi-jimmer-postgres-ci.yml'
+      - 'warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/**'
+      - 'warm-flow-orm/warm-flow-jimmer/**'
+      - 'warm-flow-plugin/warm-flow-plugin-ui/**'
+  push:
+    branches:
+      - codex/jimmer-postgres-production
+    paths:
+      - '.github/workflows/ruoyi-jimmer-postgres-ci.yml'
+      - 'warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/**'
+      - 'warm-flow-orm/warm-flow-jimmer/**'
+      - 'warm-flow-plugin/warm-flow-plugin-ui/**'
+
+concurrency:
+  group: ruoyi-jimmer-postgres-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: warm-flow-demo/warm-flow-ruoyi-jimmer-postgres
+
+jobs:
+  cold-start-smoke:
+    name: Cold-start bootstrap and API smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: maven
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Script syntax checks
+        run: |
+          sh -n scripts/cold_start_validate.sh
+          sh -n scripts/e2e_admin_designer.sh
+          node --check scripts/e2e_admin_designer.js
+          python3 -m py_compile scripts/smoke_remote.py
+
+      - name: Start PostgreSQL and Redis middleware
+        run: |
+          docker network create dev-infra
+          docker run -d \
+            --name dev-postgres \
+            --network dev-infra \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            postgres:18-alpine
+          docker run -d \
+            --name dev-redis \
+            --network dev-infra \
+            -p 6379:6379 \
+            redis:8-alpine
+          for i in {1..60}; do
+            if docker exec dev-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec dev-postgres pg_isready -U postgres
+          docker exec dev-redis redis-cli ping
+
+      - name: Build RuoYi Jimmer demo
+        run: mvn -q -DskipTests clean package
+
+      - name: Run cold-start validation and keep app for smoke
+        env:
+          KEEP_COLDSTART: 'true'
+          KEEP_FAILED_COLDSTART: 'true'
+          COLDSTART_PORT: '18081'
+          REDIS_DATABASE: '15'
+          STATE_FILE: /tmp/warm-flow-jimmer-coldstart-ci.state
+        run: scripts/cold_start_validate.sh
+
+      - name: API smoke against cold-start app
+        env:
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          REDIS_DATABASE: '15'
+          REDIS_CONTAINER: dev-redis
+        run: python3 scripts/smoke_remote.py --base-url http://127.0.0.1:18081/
+
+      - name: Dump cold-start logs on failure
+        if: failure()
+        run: |
+          docker logs --tail=240 warm-flow-jimmer-coldstart || true
+          docker ps -a || true
+
+      - name: Cleanup cold-start app
+        if: always()
+        env:
+          COLDSTART_ACTION: cleanup
+          STATE_FILE: /tmp/warm-flow-jimmer-coldstart-ci.state
+        run: scripts/cold_start_validate.sh || true
+
+  browser-e2e:
+    name: Browser E2E smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: cold-start-smoke
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == 'codex/jimmer-postgres-production'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+          cache: maven
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Start PostgreSQL and Redis middleware
+        run: |
+          docker network create dev-infra
+          docker run -d \
+            --name dev-postgres \
+            --network dev-infra \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            postgres:18-alpine
+          docker run -d \
+            --name dev-redis \
+            --network dev-infra \
+            -p 6379:6379 \
+            redis:8-alpine
+          for i in {1..60}; do
+            if docker exec dev-postgres pg_isready -U postgres >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec dev-postgres pg_isready -U postgres
+          docker exec dev-redis redis-cli ping
+
+      - name: Build RuoYi Jimmer demo
+        run: mvn -q -DskipTests clean package
+
+      - name: Run cold-start validation and keep app for E2E
+        env:
+          KEEP_COLDSTART: 'true'
+          KEEP_FAILED_COLDSTART: 'true'
+          COLDSTART_PORT: '18081'
+          REDIS_DATABASE: '15'
+          STATE_FILE: /tmp/warm-flow-jimmer-coldstart-e2e.state
+        run: scripts/cold_start_validate.sh
+
+      - name: Browser E2E against cold-start app
+        env:
+          WARM_FLOW_BASE: http://127.0.0.1:18081/
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: '6379'
+          REDIS_DATABASE: '15'
+          PLAYWRIGHT_INSTALL_DEPS: 'true'
+        run: scripts/e2e_admin_designer.sh
+
+      - name: Dump cold-start logs on failure
+        if: failure()
+        run: |
+          docker logs --tail=240 warm-flow-jimmer-coldstart || true
+          docker ps -a || true
+
+      - name: Cleanup cold-start app
+        if: always()
+        env:
+          COLDSTART_ACTION: cleanup
+          STATE_FILE: /tmp/warm-flow-jimmer-coldstart-e2e.state
+        run: scripts/cold_start_validate.sh || true

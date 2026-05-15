@@ -123,6 +123,7 @@ COLDSTART_ACTION=cleanup scripts/cold_start_validate.sh
 | `COLDSTART_PORT` | `18081` | 临时实例宿主机端口。 |
 | `REDIS_DATABASE` | `15` | 冷启动实例使用的 Redis DB，避免污染演示 DB 0。 |
 | `KEEP_COLDSTART` | `false` | 设为 `true` 时通过 health 后保留临时实例，便于继续验收。 |
+| `KEEP_FAILED_COLDSTART` | `false` | 设为 `true` 时失败后保留临时实例和临时库，便于 CI dump logs 后再 cleanup。 |
 | `STATE_FILE` | `/tmp/warm-flow-jimmer-coldstart.state` | 保留实例后的清理状态文件。 |
 
 ## 构建与容器部署
