@@ -36,3 +36,15 @@ build/
 
 .soloncode/
 /.qoder/
+
+# Warm-Flow Jimmer demo local runtime/test artifacts
+warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/.env
+warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/.env.*
+!warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-ui/.env.development
+!warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-ui/.env.production
+!warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-ui/.env.staging
+warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/.playwright-cli/
+warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/node_modules/
+warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/package-lock.json
+warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/scripts/__pycache__/
+warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/scripts/*.py[cod]

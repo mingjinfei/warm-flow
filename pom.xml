@@ -59,6 +59,7 @@
         <module>warm-flow-core</module>
         <module>warm-flow-orm</module>
         <module>warm-flow-plugin</module>
+        <module>warm-flow-demo</module>
     </modules>
 
     <properties>
@@ -95,6 +96,7 @@
         <mybatis.version>3.5.15</mybatis.version>
         <mybatis-plus.version>3.5.12</mybatis-plus.version>
         <easy-query.version>3.1.79</easy-query.version>
+        <jimmer.version>0.10.7</jimmer.version>
 
         <!-- 工具库版本 -->
         <junit.version>4.13.2</junit.version>
@@ -355,6 +357,30 @@
             <dependency>
                 <groupId>org.dromara.warm</groupId>
                 <artifactId>warm-flow-easy-query-core</artifactId>
+                <version>${warm-flow}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.dromara.warm</groupId>
+                <artifactId>warm-flow-jimmer-core</artifactId>
+                <version>${warm-flow}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.dromara.warm</groupId>
+                <artifactId>warm-flow-jimmer-sb-starter</artifactId>
+                <version>${warm-flow}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.dromara.warm</groupId>
+                <artifactId>warm-flow-jimmer-sb3-starter</artifactId>
+                <version>${warm-flow}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.dromara.warm</groupId>
+                <artifactId>warm-flow-jimmer-sb4-starter</artifactId>
                 <version>${warm-flow}</version>
             </dependency>
 
