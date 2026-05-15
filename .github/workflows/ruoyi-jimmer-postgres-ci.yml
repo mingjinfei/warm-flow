@@ -60,29 +60,43 @@ jobs:
 
       - name: Start PostgreSQL and Redis middleware
         run: |
-          docker network create dev-infra
+          docker network create dev-infra || true
           docker run -d \
             --name dev-postgres \
             --network dev-infra \
             -e POSTGRES_PASSWORD=postgres \
             -p 5432:5432 \
-            postgres:18-alpine
+            postgres:16-alpine
           docker run -d \
             --name dev-redis \
             --network dev-infra \
             -p 6379:6379 \
-            redis:8-alpine
+            redis:7-alpine
           for i in {1..60}; do
-            if docker exec dev-postgres pg_isready -U postgres >/dev/null 2>&1; then
+            if docker exec dev-postgres pg_isready -h 127.0.0.1 -U postgres -d postgres >/dev/null 2>&1; then
+              docker exec dev-postgres pg_isready -h 127.0.0.1 -U postgres -d postgres
               break
+            fi
+            if [ "$i" -eq 60 ]; then
+              docker logs dev-postgres || true
+              exit 1
             fi
             sleep 2
           done
-          docker exec dev-postgres pg_isready -U postgres
-          docker exec dev-redis redis-cli ping
+          for i in {1..30}; do
+            if docker exec dev-redis redis-cli ping | grep -q PONG; then
+              docker exec dev-redis redis-cli ping
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              docker logs dev-redis || true
+              exit 1
+            fi
+            sleep 1
+          done
 
       - name: Build RuoYi Jimmer demo
-        run: mvn -q -DskipTests clean package
+        run: mvn -q -DskipTests -f ../../pom.xml -pl warm-flow-demo/warm-flow-ruoyi-jimmer-postgres -am clean package
 
       - name: Run cold-start validation and keep app for smoke
         env:
@@ -139,29 +153,43 @@ jobs:
 
       - name: Start PostgreSQL and Redis middleware
         run: |
-          docker network create dev-infra
+          docker network create dev-infra || true
           docker run -d \
             --name dev-postgres \
             --network dev-infra \
             -e POSTGRES_PASSWORD=postgres \
             -p 5432:5432 \
-            postgres:18-alpine
+            postgres:16-alpine
           docker run -d \
             --name dev-redis \
             --network dev-infra \
             -p 6379:6379 \
-            redis:8-alpine
+            redis:7-alpine
           for i in {1..60}; do
-            if docker exec dev-postgres pg_isready -U postgres >/dev/null 2>&1; then
+            if docker exec dev-postgres pg_isready -h 127.0.0.1 -U postgres -d postgres >/dev/null 2>&1; then
+              docker exec dev-postgres pg_isready -h 127.0.0.1 -U postgres -d postgres
               break
+            fi
+            if [ "$i" -eq 60 ]; then
+              docker logs dev-postgres || true
+              exit 1
             fi
             sleep 2
           done
-          docker exec dev-postgres pg_isready -U postgres
-          docker exec dev-redis redis-cli ping
+          for i in {1..30}; do
+            if docker exec dev-redis redis-cli ping | grep -q PONG; then
+              docker exec dev-redis redis-cli ping
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              docker logs dev-redis || true
+              exit 1
+            fi
+            sleep 1
+          done
 
       - name: Build RuoYi Jimmer demo
-        run: mvn -q -DskipTests clean package
+        run: mvn -q -DskipTests -f ../../pom.xml -pl warm-flow-demo/warm-flow-ruoyi-jimmer-postgres -am clean package
 
       - name: Run cold-start validation and keep app for E2E
         env:
