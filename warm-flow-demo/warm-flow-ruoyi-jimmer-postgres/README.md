@@ -43,6 +43,7 @@
 - Health：<http://192.168.2.226:18080/health>
 - 默认账号：`admin/admin123`
 - 完整部署、环境变量、初始化数据库、容器重启、烟测与故障排查见 [`doc/deploy-ops.md`](doc/deploy-ops.md)。
+- 当前 CI、远程 smoke 与浏览器 E2E 验收证据见 [`doc/acceptance-jimmer-postgres.md`](doc/acceptance-jimmer-postgres.md)。
 
 常用命令：
 
@@ -60,7 +61,8 @@ psql "postgresql://postgres@192.168.2.226:5432/postgres" -v ON_ERROR_STOP=1 \
   -v app_password='replace-with-strong-password' \
   -f sql/postgresql/00-create-database.sql
 
-# 构建并以容器运行
+# 构建前端源码并以容器运行
+(cd ruoyi-ui && npm ci --no-audit --no-fund && npm run build:prod)
 mvn -DskipTests clean package
 docker compose -f docker-compose.deploy.yml up -d --build
 

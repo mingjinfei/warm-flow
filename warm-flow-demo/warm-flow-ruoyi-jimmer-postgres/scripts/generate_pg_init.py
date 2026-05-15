@@ -420,15 +420,15 @@ CREATE TABLE gen_table_column (
 
 CREATE TABLE flow_definition (
   id bigint PRIMARY KEY,
-  flow_code varchar(40) NOT NULL,
-  flow_name varchar(100) NOT NULL,
-  model_value varchar(40) NOT NULL DEFAULT 'CLASSICS',
+  flow_code varchar(40),
+  flow_name varchar(100),
+  model_value varchar(40) DEFAULT 'CLASSICS',
   category varchar(100),
-  "version" varchar(20) NOT NULL,
-  is_publish smallint NOT NULL DEFAULT 0,
+  "version" varchar(20),
+  is_publish smallint DEFAULT 0,
   form_custom char(1) DEFAULT 'N',
   form_path varchar(100),
-  activity_status smallint NOT NULL DEFAULT 1,
+  activity_status smallint DEFAULT 1,
   listener_type varchar(100),
   listener_path varchar(400),
   ext varchar(500),
@@ -442,10 +442,10 @@ CREATE TABLE flow_definition (
 
 CREATE TABLE flow_form (
   id bigint PRIMARY KEY,
-  form_code varchar(40) NOT NULL,
-  form_name varchar(100) NOT NULL,
-  "version" varchar(20) NOT NULL,
-  is_publish smallint NOT NULL DEFAULT 0,
+  form_code varchar(40),
+  form_name varchar(100),
+  "version" varchar(20),
+  is_publish smallint DEFAULT 0,
   form_type smallint DEFAULT 0,
   form_path varchar(100),
   form_content text,
@@ -460,9 +460,9 @@ CREATE TABLE flow_form (
 
 CREATE TABLE flow_node (
   id bigint PRIMARY KEY,
-  node_type smallint NOT NULL,
-  definition_id bigint NOT NULL,
-  node_code varchar(100) NOT NULL,
+  node_type smallint,
+  definition_id bigint,
+  node_code varchar(100),
   node_name varchar(100),
   permission_flag varchar(200),
   node_ratio varchar(200),
@@ -472,7 +472,7 @@ CREATE TABLE flow_node (
   listener_path varchar(400),
   form_custom char(1) DEFAULT 'N',
   form_path varchar(100),
-  "version" varchar(20) NOT NULL,
+  "version" varchar(20),
   create_time timestamp,
   create_by varchar(64) DEFAULT '',
   update_time timestamp,
@@ -484,11 +484,11 @@ CREATE TABLE flow_node (
 
 CREATE TABLE flow_skip (
   id bigint PRIMARY KEY,
-  definition_id bigint NOT NULL,
+  definition_id bigint,
   node_id bigint NULL,
-  now_node_code varchar(100) NOT NULL,
+  now_node_code varchar(100),
   now_node_type smallint,
-  next_node_code varchar(100) NOT NULL,
+  next_node_code varchar(100),
   next_node_type smallint,
   skip_name varchar(100),
   skip_type varchar(40),
@@ -504,14 +504,14 @@ CREATE TABLE flow_skip (
 
 CREATE TABLE flow_instance (
   id bigint PRIMARY KEY,
-  definition_id bigint NOT NULL,
-  business_id varchar(40) NOT NULL,
-  node_type smallint NOT NULL,
-  node_code varchar(40) NOT NULL,
+  definition_id bigint,
+  business_id varchar(40),
+  node_type smallint,
+  node_code varchar(40),
   node_name varchar(100),
   variable text,
-  flow_status varchar(20) NOT NULL,
-  activity_status smallint NOT NULL DEFAULT 1,
+  flow_status varchar(20),
+  activity_status smallint DEFAULT 1,
   form_custom char(1) DEFAULT 'N',
   form_path varchar(100),
   def_json text,
@@ -526,12 +526,12 @@ CREATE TABLE flow_instance (
 
 CREATE TABLE flow_task (
   id bigint PRIMARY KEY,
-  definition_id bigint NOT NULL,
-  instance_id bigint NOT NULL,
-  node_code varchar(100) NOT NULL,
+  definition_id bigint,
+  instance_id bigint,
+  node_code varchar(100),
   node_name varchar(100),
-  node_type smallint NOT NULL,
-  flow_status varchar(20) NOT NULL,
+  node_type smallint,
+  flow_status varchar(20),
   form_custom char(1) DEFAULT 'N',
   form_path varchar(100),
   create_time timestamp,
@@ -544,19 +544,19 @@ CREATE TABLE flow_task (
 
 CREATE TABLE flow_his_task (
   id bigint PRIMARY KEY,
-  definition_id bigint NOT NULL,
-  instance_id bigint NOT NULL,
-  task_id bigint NOT NULL,
+  definition_id bigint,
+  instance_id bigint,
+  task_id bigint,
   node_code varchar(100),
   node_name varchar(100),
   node_type smallint,
   target_node_code varchar(200),
   target_node_name varchar(200),
   approver varchar(40),
-  cooperate_type smallint NOT NULL DEFAULT 0,
+  cooperate_type smallint DEFAULT 0,
   collaborator varchar(500),
   skip_type varchar(10),
-  flow_status varchar(20) NOT NULL,
+  flow_status varchar(20),
   form_custom char(1) DEFAULT 'N',
   form_path varchar(100),
   ext text,
@@ -570,9 +570,9 @@ CREATE TABLE flow_his_task (
 
 CREATE TABLE flow_user (
   id bigint PRIMARY KEY,
-  "type" char(1) NOT NULL,
+  "type" char(1),
   processed_by varchar(80),
-  associated bigint NOT NULL,
+  associated bigint,
   create_time timestamp,
   create_by varchar(64) DEFAULT '',
   update_time timestamp,
@@ -667,10 +667,10 @@ CREATE TABLE QRTZ_JOB_DETAILS (
     job_group varchar(200) NOT NULL,
     description varchar(250),
     job_class_name varchar(250) NOT NULL,
-    is_durable varchar(1) NOT NULL,
-    is_nonconcurrent varchar(1) NOT NULL,
-    is_update_data varchar(1) NOT NULL,
-    requests_recovery varchar(1) NOT NULL,
+    is_durable boolean NOT NULL,
+    is_nonconcurrent boolean NOT NULL,
+    is_update_data boolean NOT NULL,
+    requests_recovery boolean NOT NULL,
     job_data bytea,
     PRIMARY KEY (sched_name, job_name, job_group)
 );
@@ -744,8 +744,8 @@ CREATE TABLE QRTZ_FIRED_TRIGGERS (
     state varchar(16) NOT NULL,
     job_name varchar(200),
     job_group varchar(200),
-    is_nonconcurrent varchar(1),
-    requests_recovery varchar(1),
+    is_nonconcurrent boolean,
+    requests_recovery boolean,
     PRIMARY KEY (sched_name, entry_id)
 );
 CREATE TABLE QRTZ_SCHEDULER_STATE (
@@ -773,11 +773,35 @@ CREATE TABLE QRTZ_SIMPROP_TRIGGERS (
     long_prop_2 bigint,
     dec_prop_1 numeric(13,4),
     dec_prop_2 numeric(13,4),
-    bool_prop_1 varchar(1),
-    bool_prop_2 varchar(1),
+    bool_prop_1 boolean,
+    bool_prop_2 boolean,
     PRIMARY KEY (sched_name, trigger_name, trigger_group),
     FOREIGN KEY (sched_name, trigger_name, trigger_group) REFERENCES QRTZ_TRIGGERS(sched_name, trigger_name, trigger_group)
 );
+
+-- Quartz's PostgreSQL JDBC delegate writes native boolean values. The standard
+-- indexes below keep trigger acquisition and recovery queries efficient once
+-- the scheduler is persisted and clustered.
+CREATE INDEX IDX_QRTZ_J_REQ_RECOVERY ON QRTZ_JOB_DETAILS (sched_name, requests_recovery);
+CREATE INDEX IDX_QRTZ_J_GRP ON QRTZ_JOB_DETAILS (sched_name, job_group);
+CREATE INDEX IDX_QRTZ_T_J ON QRTZ_TRIGGERS (sched_name, job_name, job_group);
+CREATE INDEX IDX_QRTZ_T_JG ON QRTZ_TRIGGERS (sched_name, job_group);
+CREATE INDEX IDX_QRTZ_T_C ON QRTZ_TRIGGERS (sched_name, calendar_name);
+CREATE INDEX IDX_QRTZ_T_G ON QRTZ_TRIGGERS (sched_name, trigger_group);
+CREATE INDEX IDX_QRTZ_T_STATE ON QRTZ_TRIGGERS (sched_name, trigger_state);
+CREATE INDEX IDX_QRTZ_T_N_STATE ON QRTZ_TRIGGERS (sched_name, trigger_name, trigger_group, trigger_state);
+CREATE INDEX IDX_QRTZ_T_N_G_STATE ON QRTZ_TRIGGERS (sched_name, trigger_group, trigger_state);
+CREATE INDEX IDX_QRTZ_T_NEXT_FIRE_TIME ON QRTZ_TRIGGERS (sched_name, next_fire_time);
+CREATE INDEX IDX_QRTZ_T_NFT_ST ON QRTZ_TRIGGERS (sched_name, trigger_state, next_fire_time);
+CREATE INDEX IDX_QRTZ_T_NFT_MISFIRE ON QRTZ_TRIGGERS (sched_name, misfire_instr, next_fire_time);
+CREATE INDEX IDX_QRTZ_T_NFT_ST_MISFIRE ON QRTZ_TRIGGERS (sched_name, misfire_instr, next_fire_time, trigger_state);
+CREATE INDEX IDX_QRTZ_T_NFT_ST_MISFIRE_GRP ON QRTZ_TRIGGERS (sched_name, misfire_instr, next_fire_time, trigger_group, trigger_state);
+CREATE INDEX IDX_QRTZ_FT_TRIG_INST_NAME ON QRTZ_FIRED_TRIGGERS (sched_name, instance_name);
+CREATE INDEX IDX_QRTZ_FT_INST_JOB_REQ_RCVRY ON QRTZ_FIRED_TRIGGERS (sched_name, instance_name, requests_recovery);
+CREATE INDEX IDX_QRTZ_FT_J_G ON QRTZ_FIRED_TRIGGERS (sched_name, job_name, job_group);
+CREATE INDEX IDX_QRTZ_FT_JG ON QRTZ_FIRED_TRIGGERS (sched_name, job_group);
+CREATE INDEX IDX_QRTZ_FT_T_G ON QRTZ_FIRED_TRIGGERS (sched_name, trigger_name, trigger_group);
+CREATE INDEX IDX_QRTZ_FT_TG ON QRTZ_FIRED_TRIGGERS (sched_name, trigger_group);
 """
 
 TAIL = r"""

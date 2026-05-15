@@ -87,6 +87,27 @@ psql "postgresql://warm_flow_jimmer_demo@192.168.2.226:5432/warm_flow_jimmer_dem
 python3 scripts/generate_pg_init.py
 ```
 
+## 已有环境升级
+
+已有共享开发库、预发库或生产库升级时，只执行 `sql/migration/` 下经过审阅的增量脚本，禁止对已有库重跑 bootstrap。当前分支包含的增量迁移：
+
+- `sql/migration/V20260515_001__quartz_postgres_boolean_columns.sql`：将既有 `QRTZ_*` 表中 Quartz PostgreSQL delegate 使用的 boolean 字段从 `varchar(1)` 迁移为 PostgreSQL `boolean`，并补齐标准 Quartz 运行态索引。
+
+示例：
+
+```sh
+psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f sql/migration/V20260515_001__quartz_postgres_boolean_columns.sql
+
+psql "$APP_DATABASE_URL" -Atc "
+select table_name, column_name, data_type
+from information_schema.columns
+where table_schema = 'public'
+  and table_name in ('qrtz_job_details','qrtz_fired_triggers','qrtz_simprop_triggers')
+  and column_name in ('is_durable','is_nonconcurrent','is_update_data','requests_recovery','bool_prop_1','bool_prop_2')
+order by table_name, column_name;"
+```
+
 ## 冷启动验收
 
 冷启动验收脚本：`scripts/cold_start_validate.sh`。它会在 Docker 主机上创建临时 PostgreSQL 库和临时用户，使用应用用户导入 `sql/postgresql/ruoyi-warm-flow-jimmer-postgres.sql`，再启动一个临时应用容器指向该新库并等待 `/health`。脚本默认结束后删除临时容器、临时卷、临时库和临时用户，不会重置共享开发库或生产库。
@@ -128,9 +149,12 @@ COLDSTART_ACTION=cleanup scripts/cold_start_validate.sh
 
 ## 构建与容器部署
 
+CI 会先从 `ruoyi-ui` 源码执行 `npm ci --no-audit --no-fund` 与 `npm run build:prod`，再打包后端，确保完整后台源码仍可构建。当前 `ruoyi-ui/dist` 与 `ruoyi-admin/src/main/resources/static` 中的 RuoYi 静态资源保持一致；Warm-Flow 设计器静态资源由 `warm-flow-ui` 集成在 `static/warm-flow-ui/`。
+
 在项目根目录执行：
 
 ```sh
+(cd ruoyi-ui && npm ci --no-audit --no-fund && npm run build:prod)
 mvn -DskipTests clean package
 docker network inspect dev-infra >/dev/null 2>&1 || docker network create dev-infra
 docker compose -f docker-compose.deploy.yml up -d --build
@@ -213,7 +237,7 @@ scripts/smoke_remote.sh --base-url http://192.168.2.226:18080/
 - 直接刷新完整 RuoYi 管理后台路由仍能渲染 SPA，而不是退回登录页或空白页。
 - Warm-Flow 设计器会用当前 `Admin-Token` 覆盖本地陈旧 `Warm-Authorization`，并成功调用 `/warm-flow/query-def`、`/warm-flow/listener-list`。
 
-默认目标为 `http://192.168.2.226:18080/`，账号为 `admin/admin123`。如果 Redis 开启密码，通过环境变量传入，不要写入 Git：
+默认目标为 `http://192.168.2.226:18080/`，账号为 `admin/admin123`。如果 Redis 开启密码，通过环境变量传入，不要写入 Git。当前 CI、远程 smoke 与浏览器 E2E 验收记录见 [`acceptance-jimmer-postgres.md`](acceptance-jimmer-postgres.md)：
 
 ```sh
 REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/e2e_admin_designer.sh

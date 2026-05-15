@@ -95,6 +95,12 @@ jobs:
             sleep 1
           done
 
+      - name: Build RuoYi UI from source
+        working-directory: warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-ui
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build:prod
+
       - name: Build RuoYi Jimmer demo
         run: mvn -q -DskipTests -f ../../pom.xml -pl warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-admin -am clean package
 
@@ -187,6 +193,12 @@ jobs:
             fi
             sleep 1
           done
+
+      - name: Build RuoYi UI from source
+        working-directory: warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-ui
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build:prod
 
       - name: Build RuoYi Jimmer demo
         run: mvn -q -DskipTests -f ../../pom.xml -pl warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-admin -am clean package
