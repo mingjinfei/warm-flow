@@ -36,11 +36,11 @@ public class SysIndexController
     public AjaxResult health()
     {
         AjaxResult ajax = AjaxResult.success();
+        ajax.put("status", "UP");
         ajax.put("name", "Warm-Flow Admin Jimmer");
         ajax.put("version", ruoyiConfig.getVersion());
         ajax.put("ui", "/index.html");
         ajax.put("workflowDesigner", "/warm-flow-ui/index.html");
-        ajax.put("auth", "admin / admin123");
         return ajax;
     }
 }

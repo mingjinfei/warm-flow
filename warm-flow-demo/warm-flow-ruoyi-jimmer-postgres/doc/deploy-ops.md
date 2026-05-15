@@ -24,8 +24,17 @@
 | `REDIS_DATABASE` | `0` | Redis DB。 |
 | `REDIS_PASSWORD` | 空 | Redis 密码，按目标环境设置。 |
 | Docker network | `dev-infra` | 应用、`dev-postgres`、`dev-redis` 共享的外部 Docker 网络。 |
-| `RUOYI_TOKEN_SECRET` | `warm-flow-jimmer-postgres-change-me` | JWT 密钥，非本地环境必须覆盖。 |
+| `RUOYI_TOKEN_SECRET` | 无 | 必填 JWT 密钥；部署前必须设置 32 位以上随机值，示例值会被启动守卫拒绝。 |
 | `RUOYI_TOKEN_EXPIRE_MINUTES` | `120` | token 有效期。 |
+| `RUOYI_LOG_LEVEL` | `info` | RuoYi 业务日志级别；临时排查才改为 `debug`。 |
+| `WARM_FLOW_LOG_LEVEL` | `info` | Warm-Flow 日志级别；临时排查才改为 `debug`。 |
+| `SPRING_DEVTOOLS_RESTART_ENABLED` | `false` | devtools restart 默认关闭，避免生产运行期热重启。 |
+| `SWAGGER_ENABLED` | `false` | Swagger 默认关闭；仅内网调试时临时开启。 |
+| `DRUID_WEB_STAT_ENABLED` | `false` | Druid Web 统计过滤器默认关闭。 |
+| `DRUID_STAT_VIEW_ENABLED` | `false` | Druid 控制台默认关闭。 |
+| `DRUID_PUBLIC_ACCESS_ENABLED` | `false` | 即使启用 Druid 控制台，也默认不匿名放行 `/druid/**`。如需原 Druid 登录页调试，需显式开启并配置白名单/密码。 |
+| `DRUID_ALLOW` | `127.0.0.1` | Druid 控制台白名单，启用控制台时必须按内网来源收敛。 |
+| `DRUID_LOGIN_USERNAME` / `DRUID_LOGIN_PASSWORD` | 空 | Druid 控制台账号密码；启用控制台时必须设置强口令。 |
 | `JIMMER_SHOW_SQL` | `false` | 是否输出 Jimmer SQL。 |
 | `JIMMER_PRETTY_SQL` | `false` | 是否格式化 SQL。 |
 
@@ -41,8 +50,22 @@ REDIS_HOST=dev-redis
 REDIS_PORT=6379
 REDIS_DATABASE=0
 REDIS_PASSWORD=change-me-if-any
-RUOYI_TOKEN_SECRET=change-me-long-random-secret
+# 先在 shell 中生成密钥，再把输出写成 RUOYI_TOKEN_SECRET=<生成值>
+openssl rand -base64 48 | tr -d '\n'
+RUOYI_TOKEN_SECRET=<paste-generated-secret>
+SWAGGER_ENABLED=false
+DRUID_STAT_VIEW_ENABLED=false
 ```
+
+
+## 生产安全基线
+
+- 部署前必须设置强随机 `RUOYI_TOKEN_SECRET`；空值、示例值和过短值会触发启动失败。只有本地临时调试才允许显式设置 `RUOYI_ALLOW_INSECURE_TOKEN_SECRET=true`。部署脚本会在前端构建前校验该变量，避免长时间构建后才失败。
+- 默认日志级别为 `info`，`devtools.restart`、Swagger 与 Druid 控制台默认关闭，避免把调试入口暴露到共享环境。
+- 如需临时开启 Swagger，设置 `SWAGGER_ENABLED=true` 后只在受控内网使用，排查后关闭。
+- 如需临时开启 Druid，至少设置 `DRUID_STAT_VIEW_ENABLED=true`、强口令 `DRUID_LOGIN_USERNAME/DRUID_LOGIN_PASSWORD`、收敛 `DRUID_ALLOW`；只有确需访问 Druid 自带登录页时才设置 `DRUID_PUBLIC_ACCESS_ENABLED=true`。
+- 首次登录后请立即修改默认 `admin/admin123` 密码，并按环境轮换数据库、Redis 与 Druid 口令。
+- 保持 `jimmer.database-validation-mode=ERROR`，让实体/schema 漂移在启动阶段 fail fast。
 
 ## 初始化数据库
 
@@ -92,12 +115,16 @@ python3 scripts/generate_pg_init.py
 已有共享开发库、预发库或生产库升级时，只执行 `sql/migration/` 下经过审阅的增量脚本，禁止对已有库重跑 bootstrap。当前分支包含的增量迁移：
 
 - `sql/migration/V20260515_001__quartz_postgres_boolean_columns.sql`：将既有 `QRTZ_*` 表中 Quartz PostgreSQL delegate 使用的 boolean 字段从 `varchar(1)` 迁移为 PostgreSQL `boolean`，并补齐标准 Quartz 运行态索引。
+- `sql/migration/V20260515_002__warm_flow_engine_not_null_columns.sql`：将 Warm-Flow 引擎必填列恢复为 `NOT NULL`，同时保留历史任务 `node_code/node_type` 与 Jimmer 模型一致的可空语义。
 
 示例：
 
 ```sh
 psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f sql/migration/V20260515_001__quartz_postgres_boolean_columns.sql
+
+psql "$APP_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f sql/migration/V20260515_002__warm_flow_engine_not_null_columns.sql
 
 psql "$APP_DATABASE_URL" -Atc "
 select table_name, column_name, data_type
@@ -149,12 +176,13 @@ COLDSTART_ACTION=cleanup scripts/cold_start_validate.sh
 
 ## 构建与容器部署
 
-CI 会先从 `ruoyi-ui` 源码执行 `npm ci --no-audit --no-fund` 与 `npm run build:prod`，再打包后端，确保完整后台源码仍可构建。当前 `ruoyi-ui/dist` 与 `ruoyi-admin/src/main/resources/static` 中的 RuoYi 静态资源保持一致；Warm-Flow 设计器静态资源由 `warm-flow-ui` 集成在 `static/warm-flow-ui/`。
+CI 会先从 `ruoyi-ui` 源码执行 `npm ci --no-audit --no-fund` 与 `npm run build:prod`，再打包后端，确保完整后台源码仍可构建。部署脚本会调用 `scripts/sync_ruoyi_static.sh`，把最新 `ruoyi-ui/dist` 同步到 `ruoyi-admin/src/main/resources/static`，并保留 `static/warm-flow-ui/` 中的 Warm-Flow 设计器静态资源。
 
 在项目根目录执行：
 
 ```sh
 (cd ruoyi-ui && npm ci --no-audit --no-fund && npm run build:prod)
+scripts/sync_ruoyi_static.sh
 mvn -DskipTests clean package
 docker network inspect dev-infra >/dev/null 2>&1 || docker network create dev-infra
 docker compose -f docker-compose.deploy.yml up -d --build
@@ -189,7 +217,7 @@ curl -fsS http://192.168.2.226:18080/health
 
 烟测脚本：`scripts/smoke_remote.py`，覆盖：
 
-- `/health`
+- `/health`（只暴露 liveness/版本/入口信息，不返回默认账号密码）
 - `/warm-flow-ui/index.html`
 - `/captchaImage`
 - `/login`

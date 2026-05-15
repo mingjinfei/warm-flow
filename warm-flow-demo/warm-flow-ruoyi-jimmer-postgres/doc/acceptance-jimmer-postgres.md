@@ -23,10 +23,18 @@
 2026-05-15 当前健康检查返回：
 
 ```json
-{"msg":"操作成功","code":200,"ui":"/index.html","workflowDesigner":"/warm-flow-ui/index.html","auth":"admin / admin123","name":"Warm-Flow Admin Jimmer","version":"3.9.1-jimmer-postgres"}
+{"msg":"操作成功","code":200,"ui":"/index.html","workflowDesigner":"/warm-flow-ui/index.html","name":"Warm-Flow Admin Jimmer","version":"3.9.1-jimmer-postgres","status":"UP"}
 ```
 
 该环境已部署本次最新 jar，并已完成 API smoke 与浏览器 E2E 复测。
+
+2026-05-15 生产化硬化部署复测：
+
+- 容器状态：`warm-flow-jimmer-demo Up ... (healthy)`。
+- `/health`：返回 `code=200` 与 `status=UP`，不再包含默认账号密码。
+- `/druid/login.html`：HTTP 200 包裹业务 `code=401`，匿名访问被 Spring Security 拦截。
+- `/swagger-ui.html`：HTTP 200 包裹业务 `code=401`，匿名访问被 Spring Security 拦截。
+- 运行环境：`RUOYI_LOG_LEVEL=info`、`WARM_FLOW_LOG_LEVEL=info`、`SWAGGER_ENABLED=false`、`DRUID_STAT_VIEW_ENABLED=false`、`DRUID_PUBLIC_ACCESS_ENABLED=false`。
 
 ## CI 验收
 
@@ -39,7 +47,7 @@ Fork PR：<https://github.com/mingjinfei/warm-flow/pull/1>
 | RuoYi Jimmer PostgreSQL CI | `25911155071` / `Cold-start bootstrap and API smoke` | success | push 冷启动、完整 API smoke |
 | RuoYi Jimmer PostgreSQL CI | `25911155071` / `Browser E2E smoke` | success | push 浏览器级完整后台路由与设计器 token 自愈 |
 
-> 2026-05-15 已新增 `Build RuoYi UI from source` 门禁：每个 RuoYi Jimmer PostgreSQL CI job 都会执行 `npm ci --no-audit --no-fund` 与 `npm run build:prod`，防止只验证已提交静态产物。`a38f6542` 的后续 CI 暴露 Warm-Flow engine 表 nullability 过宽问题；当前提交用模型一致的 `NOT NULL` bootstrap 与 `V20260515_002` 增量迁移修复，推送后以 PR 最新 run 为准。
+> 2026-05-15 已新增 `Build RuoYi UI from source` 与 `Sync RuoYi UI into Spring Boot static assets` 门禁：每个 RuoYi Jimmer PostgreSQL CI job 都会执行 `npm ci --no-audit --no-fund`、`npm run build:prod` 和 `scripts/sync_ruoyi_static.sh`，防止只验证已提交静态产物或打包旧后台资源。`a38f6542` 的后续 CI 暴露 Warm-Flow engine 表 nullability 过宽问题；当前提交用模型一致的 `NOT NULL` bootstrap 与 `V20260515_002` 增量迁移修复，推送后以 PR 最新 run 为准。
 
 关键 CI 命令：
 
@@ -47,6 +55,16 @@ Fork PR：<https://github.com/mingjinfei/warm-flow/pull/1>
 gh run view 25911155071 --repo mingjinfei/warm-flow --json status,conclusion,jobs,url
 gh pr view 1 --repo mingjinfei/warm-flow --json state,url,headRefName,baseRefName,mergeable,statusCheckRollup
 ```
+
+
+## 生产化硬化补充（2026-05-15）
+
+- 默认日志级别从 `debug` 收敛为环境变量驱动的 `info`。
+- `spring.devtools.restart`、Swagger、Druid WebStat/Druid 控制台默认关闭。
+- `RUOYI_TOKEN_SECRET` 无默认示例值；启动守卫会拒绝空白、过短或示例 JWT 密钥。
+- `/swagger/**` 和 `/druid/**` 不再默认匿名放行；Druid 只有显式开启控制台与匿名访问开关时才允许未认证访问。
+- 匿名 `/health` 只保留 liveness/版本/入口信息，健康检查不泄露 `auth` 或默认账号密码。
+- 部署脚本和 CI 均在后端打包前同步 `ruoyi-ui/dist` 到 `ruoyi-admin/src/main/resources/static`，避免部署旧后台资源。
 
 ## 本地与临时库验收（2026-05-15）
 
@@ -57,6 +75,8 @@ gh pr view 1 --repo mingjinfei/warm-flow --json state,url,headRefName,baseRefNam
 - Quartz DDL 校验：`QRTZ_*` boolean 字段为 PostgreSQL `boolean`，并包含 20 个标准 Quartz 运行态索引。
 - `mvn -q -DskipTests -f pom.xml -pl warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-admin -am clean package`：通过，路径与 GitHub Actions root-pom 构建一致。
 - `(cd ruoyi-ui && npm ci --no-audit --no-fund && npm run build:prod)`：通过，仅有既有 asset size warning。
+- `scripts/sync_ruoyi_static.sh`：通过，确认后端 jar 打包前同步最新 RuoYi 静态资源并保留 Warm-Flow 设计器资源。
+- `sh -n scripts/cold_start_validate.sh scripts/e2e_admin_designer.sh scripts/sync_ruoyi_static.sh bin/deploy_docker.sh`：通过。
 - `git diff --check` 与 `python3 -m py_compile ...`：通过。
 
 远程临时库 cold-start 验收（不重置共享库）：
@@ -101,6 +121,19 @@ psql -v ON_ERROR_STOP=1 -d warm_flow_jimmer_demo \
 - `flow_his_task.flow_status=NO`
 - `flow_his_task.node_code=YES`、`flow_his_task.node_type=YES`（与 `FlowHisTaskModel` 的 `@Nullable` 保持一致）
 
+
+## 远程硬化部署与安全入口验证（2026-05-15）
+
+部署动作：保留共享开发库，仅备份并替换 `/home/foo/warm-flow-jimmer-demo/app.jar`，补齐 `.env` 中的强 `RUOYI_TOKEN_SECRET` 与生产默认开关，随后重建 `warm-flow-jimmer-demo` 容器。部署成功时最新备份文件为 `app.jar.bak-20260515195534`。
+
+验收结果：
+
+- `curl -fsS http://127.0.0.1:18080/health`：通过，返回 `status=UP` 且不包含 `auth`。
+- `scripts/smoke_remote.py --base-url http://127.0.0.1:18080/ ...`：`SMOKE PASS`，覆盖系统管理、监控、代码生成、流程定义、表单、待办、已办与 Warm-Flow 设计器 API。
+- Playwright Docker 临时容器执行 `scripts/e2e_admin_designer.js`：`bad=[]`，覆盖 `/index`、`/system/user`、`/monitor/server`、`/tool/gen`、`/flow/definition`、`/flow/1` 和 `/warm-flow-ui/index.html`。
+- `scripts/cold_start_validate.sh` 使用新 jar、临时库、临时端口 `18082`：`BOOTSTRAP tables=41/users=22/menus=131`，`HEALTH_OK` 返回 `status=UP` 且无 `auth`，结束后自动清理临时库、临时容器与临时卷。
+- CI/远程安全入口探测：`/health` 不包含 `auth`；`/swagger-ui.html`、`/v3/api-docs`、`/druid/login.html` 默认返回业务 `code=401`。
+- `docker logs --tail=240 warm-flow-jimmer-demo | grep -Ei 'ERROR|Exception|Failed|Traceback'`：无命中。
 
 ## 远程部署 smoke
 

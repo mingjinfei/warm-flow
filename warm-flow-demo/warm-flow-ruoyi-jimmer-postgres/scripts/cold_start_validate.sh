@@ -26,7 +26,6 @@ REDIS_HOST=${REDIS_HOST:-dev-redis}
 REDIS_PORT=${REDIS_PORT:-6379}
 REDIS_DATABASE=${REDIS_DATABASE:-15}
 REDIS_PASSWORD=${REDIS_PASSWORD:-}
-RUOYI_TOKEN_SECRET=${RUOYI_TOKEN_SECRET:-warm-flow-jimmer-coldstart-change-me}
 JIMMER_SHOW_SQL=${JIMMER_SHOW_SQL:-false}
 JIMMER_PRETTY_SQL=${JIMMER_PRETTY_SQL:-false}
 HEALTH_RETRIES=${HEALTH_RETRIES:-90}
@@ -51,6 +50,8 @@ random_password() {
     printf 'ColdStart_%s_%s_Pw' "$(date +%s)" "$$"
   fi
 }
+
+RUOYI_TOKEN_SECRET=${RUOYI_TOKEN_SECRET:-$(random_password)$(random_password)}
 
 absolute_path() {
   case "$1" in
@@ -195,6 +196,12 @@ $DOCKER run -d \
   -e REDIS_PASSWORD="$REDIS_PASSWORD" \
   -e RUOYI_TOKEN_SECRET="$RUOYI_TOKEN_SECRET" \
   -e RUOYI_TOKEN_EXPIRE_MINUTES=120 \
+  -e RUOYI_LOG_LEVEL=info \
+  -e WARM_FLOW_LOG_LEVEL=info \
+  -e SPRING_DEVTOOLS_RESTART_ENABLED=false \
+  -e SWAGGER_ENABLED=false \
+  -e DRUID_WEB_STAT_ENABLED=false \
+  -e DRUID_STAT_VIEW_ENABLED=false \
   -e JIMMER_SHOW_SQL="$JIMMER_SHOW_SQL" \
   -e JIMMER_PRETTY_SQL="$JIMMER_PRETTY_SQL" \
   "$APP_IMAGE" \

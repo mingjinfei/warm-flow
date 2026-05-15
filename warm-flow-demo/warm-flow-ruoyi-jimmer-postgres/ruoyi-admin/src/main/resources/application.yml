@@ -34,9 +34,9 @@ server:
 # 日志配置
 logging:
   level:
-    com.ruoyi: debug
+    com.ruoyi: ${RUOYI_LOG_LEVEL:info}
     org.springframework: warn
-    org.dromara.warm: debug
+    org.dromara.warm: ${WARM_FLOW_LOG_LEVEL:info}
 
 # 用户配置
 user:
@@ -65,7 +65,7 @@ spring:
   devtools:
     restart:
       # 热部署开关
-      enabled: true
+      enabled: ${SPRING_DEVTOOLS_RESTART_ENABLED:false}
   # redis 配置
   redis:
     # 地址
@@ -103,9 +103,15 @@ token:
   # 令牌自定义标识
   header: Authorization
   # 令牌密钥
-  secret: ${RUOYI_TOKEN_SECRET:warm-flow-jimmer-postgres-change-me}
+  secret: ${RUOYI_TOKEN_SECRET:}
   # 令牌有效期（默认30分钟）
   expireTime: ${RUOYI_TOKEN_EXPIRE_MINUTES:120}
+
+# 生产安全保护：默认拒绝空白、示例或过短的 JWT 密钥启动。
+# 本地临时调试如需放宽，可显式设置 RUOYI_ALLOW_INSECURE_TOKEN_SECRET=true。
+security:
+  allow-insecure-token-secret: ${RUOYI_ALLOW_INSECURE_TOKEN_SECRET:false}
+  druid-public-access: ${DRUID_PUBLIC_ACCESS_ENABLED:false}
 
 # Jimmer ORM configuration for the full RuoYi admin + Warm-Flow stack.
 jimmer:
@@ -118,7 +124,7 @@ jimmer:
 # Swagger配置
 swagger:
   # 是否开启swagger
-  enabled: true
+  enabled: ${SWAGGER_ENABLED:false}
   # 请求前缀
   pathMapping: /dev-api
 

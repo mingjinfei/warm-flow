@@ -55,6 +55,8 @@ jobs:
         run: |
           sh -n scripts/cold_start_validate.sh
           sh -n scripts/e2e_admin_designer.sh
+          sh -n scripts/sync_ruoyi_static.sh
+          sh -n bin/deploy_docker.sh
           node --check scripts/e2e_admin_designer.js
           python3 -m py_compile scripts/smoke_remote.py
 
@@ -101,6 +103,9 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build:prod
 
+      - name: Sync RuoYi UI into Spring Boot static assets
+        run: scripts/sync_ruoyi_static.sh
+
       - name: Build RuoYi Jimmer demo
         run: mvn -q -DskipTests -f ../../pom.xml -pl warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-admin -am clean package
 
@@ -120,6 +125,28 @@ jobs:
           REDIS_DATABASE: '15'
           REDIS_CONTAINER: dev-redis
         run: python3 scripts/smoke_remote.py --base-url http://127.0.0.1:18081/
+
+      - name: Security endpoint deny smoke
+        run: |
+          set -euo pipefail
+          health="$(curl -fsS http://127.0.0.1:18081/health)"
+          if grep -qi '"auth"' <<<"$health"; then
+            echo "health endpoint must not disclose login credentials: $health" >&2
+            exit 1
+          fi
+          for path in /swagger-ui.html /v3/api-docs /druid/login.html; do
+            safe_path="$(printf '%s' "$path" | tr '/' '_')"
+            body_file="/tmp/security-deny-${safe_path}.json"
+            http_code="$(curl -sS -o "$body_file" -w '%{http_code}' "http://127.0.0.1:18081${path}")"
+            body="$(cat "$body_file")"
+            if [[ "$http_code" =~ ^(401|403|404)$ ]]; then
+              continue
+            fi
+            if ! grep -q '"code":401' <<<"$body"; then
+              echo "expected ${path} to be denied, got HTTP ${http_code}: $body" >&2
+              exit 1
+            fi
+          done
 
       - name: Dump cold-start logs on failure
         if: failure()
@@ -199,6 +226,9 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm run build:prod
+
+      - name: Sync RuoYi UI into Spring Boot static assets
+        run: scripts/sync_ruoyi_static.sh
 
       - name: Build RuoYi Jimmer demo
         run: mvn -q -DskipTests -f ../../pom.xml -pl warm-flow-demo/warm-flow-ruoyi-jimmer-postgres/ruoyi-admin -am clean package

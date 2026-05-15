@@ -1,6 +1,7 @@
 package com.ruoyi.framework.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -68,6 +69,19 @@ public class SecurityConfig
     private PermitAllUrlProperties permitAllUrl;
 
     /**
+     * Swagger and Druid are operational consoles. Keep them authenticated by
+     * default and only expose them anonymously for explicit local debugging.
+     */
+    @Value("${swagger.enabled:false}")
+    private boolean swaggerEnabled;
+
+    @Value("${spring.datasource.druid.statViewServlet.enabled:false}")
+    private boolean druidStatViewEnabled;
+
+    @Value("${security.druid-public-access:false}")
+    private boolean druidPublicAccess;
+
+    /**
      * 身份验证实现
      */
     @Bean
@@ -111,13 +125,35 @@ public class SecurityConfig
             // 注解标记允许匿名访问的url
             .authorizeHttpRequests((requests) -> {
                 permitAllUrl.getUrls().forEach(url -> requests.antMatchers(url).permitAll());
+                if (swaggerEnabled)
+                {
+                    requests.antMatchers("/swagger-ui.html", "/swagger-ui/**", "/swagger-resources/**", "/webjars/**",
+                            "/v2/api-docs", "/v3/api-docs/**", "/*/api-docs").permitAll();
+                }
+                else
+                {
+                    requests.antMatchers("/swagger-ui.html", "/swagger-ui/**", "/swagger-resources/**", "/webjars/**",
+                            "/v2/api-docs", "/v3/api-docs/**", "/*/api-docs").denyAll();
+                }
+                if (druidStatViewEnabled && druidPublicAccess)
+                {
+                    requests.antMatchers("/druid/**").permitAll();
+                }
+                else if (druidStatViewEnabled)
+                {
+                    requests.antMatchers("/druid/**").authenticated();
+                }
+                else
+                {
+                    requests.antMatchers("/druid/**").denyAll();
+                }
                 // 对于登录login 注册register 验证码captchaImage 允许匿名访问
                 requests.antMatchers("/login", "/register", "/captchaImage").permitAll()
                     // 静态资源，可匿名访问
                     .antMatchers(HttpMethod.GET, "/", "/*.html", "/**/*.html", "/**/*.css", "/**/*.js", "/profile/**").permitAll()
                     .requestMatchers(SpaRouteRequestMatcher::matches).permitAll()
-                    .antMatchers("/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/*/api-docs", "/druid/**").permitAll()
-                    .antMatchers("/warm-flow-ui/**", "/health").permitAll()
+                    .antMatchers("/warm-flow-ui/**", "/health").permitAll();
+                requests
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })
