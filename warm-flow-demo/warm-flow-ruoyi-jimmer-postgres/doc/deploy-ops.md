@@ -87,6 +87,44 @@ psql "postgresql://warm_flow_jimmer_demo@192.168.2.226:5432/warm_flow_jimmer_dem
 python3 scripts/generate_pg_init.py
 ```
 
+## 冷启动验收
+
+冷启动验收脚本：`scripts/cold_start_validate.sh`。它会在 Docker 主机上创建临时 PostgreSQL 库和临时用户，使用应用用户导入 `sql/postgresql/ruoyi-warm-flow-jimmer-postgres.sql`，再启动一个临时应用容器指向该新库并等待 `/health`。脚本默认结束后删除临时容器、临时卷、临时库和临时用户，不会重置共享开发库或生产库。
+
+典型用法：
+
+```sh
+# 在可访问 dev-postgres/dev-redis 的 Docker 主机执行；本地构建时默认使用 ruoyi-admin/target/ruoyi-admin.jar
+mvn -DskipTests clean package
+REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/cold_start_validate.sh
+```
+
+如果需要在远程服务器直接复用已部署的 jar，可覆盖 `APP_JAR`：
+
+```sh
+APP_JAR=/home/foo/warm-flow-jimmer-demo/app.jar REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/cold_start_validate.sh
+```
+
+如需在冷启动实例上继续手工跑 API smoke 或浏览器 E2E，保留临时实例：
+
+```sh
+KEEP_COLDSTART=true COLDSTART_PORT=18081 REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/cold_start_validate.sh
+REDIS_DATABASE=15 REDIS_PASSWORD='replace-with-dev-redis-password-if-any' python3 scripts/smoke_remote.py --base-url http://127.0.0.1:18081/
+WARM_FLOW_BASE=http://127.0.0.1:18081/ REDIS_DATABASE=15 REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/e2e_admin_designer.sh
+COLDSTART_ACTION=cleanup scripts/cold_start_validate.sh
+```
+
+关键环境变量：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `POSTGRES_CONTAINER` | `dev-postgres` | PostgreSQL Docker 容器名。 |
+| `APP_JAR` | `ruoyi-admin/target/ruoyi-admin.jar` | 临时容器挂载运行的应用 jar。 |
+| `COLDSTART_PORT` | `18081` | 临时实例宿主机端口。 |
+| `REDIS_DATABASE` | `15` | 冷启动实例使用的 Redis DB，避免污染演示 DB 0。 |
+| `KEEP_COLDSTART` | `false` | 设为 `true` 时通过 health 后保留临时实例，便于继续验收。 |
+| `STATE_FILE` | `/tmp/warm-flow-jimmer-coldstart.state` | 保留实例后的清理状态文件。 |
+
 ## 构建与容器部署
 
 在项目根目录执行：

@@ -68,6 +68,9 @@ docker compose -f docker-compose.deploy.yml up -d --build
 curl -fsS http://192.168.2.226:18080/health
 python3 scripts/smoke_remote.py --base-url http://192.168.2.226:18080/
 
+# 冷启动验收：临时库导入 bootstrap SQL，启动临时实例并验证 Jimmer schema
+scripts/cold_start_validate.sh
+
 # 浏览器级验收：直接刷新完整后台路由，并验证 Warm-Flow 设计器 token 自愈
 REDIS_PASSWORD='replace-with-dev-redis-password-if-any' scripts/e2e_admin_designer.sh
 ```
